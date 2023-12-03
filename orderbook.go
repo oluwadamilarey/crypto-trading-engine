@@ -90,6 +90,11 @@ func (l *Limit) DeleteOrder(o *Order) {
 	sort.Sort(l.Orders)
 }
 
+func (ob *Order) CancelOrder(o *Order) {
+	limit := o.Limit
+	limit.DeleteOrder(o)
+}
+
 func (l *Limit) Fill(o *Order) []Match {
 	var (
 		matches        []Match
@@ -170,35 +175,49 @@ func NewOrderBook() *OrderBook {
 }
 
 func (ob *OrderBook) PlaceMarketOrder(o *Order) []Match {
-	matches := []Match{}
+	matches := []Match{} // Initialize an empty slice to store matches
 
+	// Check if the market order is a bid
 	if o.Bid {
+		// Check if the market order size is greater than the total volume of asks
 		if o.Size > ob.AskTotalVolume() {
+			// Raise a panic if the market order size exceeds available ask volume
 			panic(fmt.Errorf("Not enough volume [%.2f] for market order [size: %.2f]", ob.AskTotalVolume(), o.Size))
 		}
+		// Iterate through the asks in the order book
 		for _, limit := range ob.Asks() {
+			// Fill the market order against the current ask limit and collect matches
 			limitMatches := limit.Fill(o)
 			matches = append(matches, limitMatches...)
 
+			// Check if the current ask limit has no remaining orders and clear if no limit remaining
 			if len(limit.Orders) == 0 {
 				ob.clearLimit(true, limit)
 			}
 		}
 	} else {
+		// If the market order is not a bid (it's an ask)
+		// Check if the market order size is greater than the total volume of bids
 		if o.Size > ob.BidTotalVolume() {
+			// Raise a panic if the market order size exceeds available bid volume
 			panic(fmt.Errorf("Not enough volume [%.2f] for market order [size: %.2f]", ob.BidTotalVolume(), o.Size))
 		}
+
+		// Iterate through the bids in the order books
 		for _, limit := range ob.Bids() {
+			// Fill the market order against the current bid limit and collect matches
 			limitMatches := limit.Fill(o)
 			matches = append(matches, limitMatches...)
 
+			// Check if the current bid limit has no remaining orders
 			if len(limit.Orders) == 0 {
+				// If no orders remain, clear the limit from the order book
 				ob.clearLimit(true, limit)
 			}
 		}
 	}
 
-	return matches
+	return matches // Return the collected matches resulting from the market order execution
 }
 
 func (ob *OrderBook) PlaceLimitOrder(price float64, o *Order) {
@@ -212,7 +231,6 @@ func (ob *OrderBook) PlaceLimitOrder(price float64, o *Order) {
 
 	if limit == nil {
 		limit = NewLimit(price)
-		limit.AddOrder(o)
 
 		if o.Bid {
 			ob.bids = append(ob.bids, limit)
@@ -222,6 +240,8 @@ func (ob *OrderBook) PlaceLimitOrder(price float64, o *Order) {
 			ob.AskLimits[price] = limit
 		}
 	}
+
+	limit.AddOrder(o)
 }
 
 func (ob *OrderBook) clearLimit(bid bool, l *Limit) {
