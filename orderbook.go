@@ -97,8 +97,8 @@ func (ob *Order) CancelOrder(o *Order) {
 
 func (l *Limit) Fill(o *Order) []Match {
 	var (
-		matches        []Match
-		ordersToDelete []*Order
+		matches        []Match  // Store the matches resulting from filling the order
+		ordersToDelete []*Order // Keep track of orders to delete after processing
 	)
 
 	for _, order := range l.Orders {
@@ -126,11 +126,12 @@ func (l *Limit) Fill(o *Order) []Match {
 // TODO: Add more context to fillorder function, preferably with chatGPT
 func (l *Limit) fillOrder(a, b *Order) Match {
 	var (
-		bid        *Order
-		ask        *Order
-		sizeFilled float64
+		bid        *Order  // represent the bid order
+		ask        *Order  // represent the ask order
+		sizeFilled float64 // represent the filled size in the match
 	)
 
+	// determine the bid and ask size based on their bid field
 	if a.Bid {
 		bid = a
 		ask = b
@@ -139,14 +140,16 @@ func (l *Limit) fillOrder(a, b *Order) Match {
 		ask = a
 	}
 
+	// Compare the sizes of orders 'a' and 'b' to determine the filled size and adjust sizes accordingly
 	if a.Size >= b.Size {
-		a.Size -= b.Size
-		sizeFilled = b.Size
-		b.Size = 0.0
+		// 'a' has a size greater than or equal to 'b'
+		a.Size -= b.Size    // reduce "a" size by "b"  size
+		sizeFilled = b.Size // record "b" size as the filled size
+		b.Size = 0.0        // set "b" size to zero indicating complete fill or partial fill by "a"
 	} else {
-		b.Size -= a.Size
-		sizeFilled = a.Size
-		a.Size = 0.0
+		b.Size -= a.Size    // reduce "b" size by "a" size
+		sizeFilled = a.Size // record "a" size as the filled size
+		a.Size = 0.0        // set "a" size to zero indicating complete fill or partial fill by "b"
 	}
 
 	return Match{
@@ -222,41 +225,50 @@ func (ob *OrderBook) PlaceMarketOrder(o *Order) []Match {
 
 func (ob *OrderBook) PlaceLimitOrder(price float64, o *Order) {
 	var limit *Limit
-
+	// Determine whether the order is a bid or ask and retrieve the corresponding limit
 	if o.Bid {
 		limit = ob.BidLimits[price]
 	} else {
 		limit = ob.AskLimits[price]
 	}
 
+	// If the limit at the specified price does not exist, create a new limit
 	if limit == nil {
 		limit = NewLimit(price)
 
+		// Assign the new limit to the corresponding side of the order book and update the associated maps
 		if o.Bid {
-			ob.bids = append(ob.bids, limit)
-			ob.BidLimits[price] = limit
+			ob.bids = append(ob.bids, limit) // Add the new limit to the bids slice
+			ob.BidLimits[price] = limit      // Update the BidLimits map with the new limit
 		} else {
-			ob.asks = append(ob.asks, limit)
-			ob.AskLimits[price] = limit
+			ob.asks = append(ob.asks, limit) // Add the new limit to the asks slice
+			ob.AskLimits[price] = limit      // Update the AskLimits map with the new limit
 		}
 	}
 
-	limit.AddOrder(o)
+	limit.AddOrder(o) // Add the order to the identified or newly created limit
 }
 
 func (ob *OrderBook) clearLimit(bid bool, l *Limit) {
+	// If the limit is on the bid side
 	if bid {
-		delete(ob.BidLimits, l.Price)
+		delete(ob.BidLimits, l.Price) // Remove the limit from BidLimits map using its price as the key
+		// Find and remove the limit from the bids slice
 		for i := 0; i < len(ob.bids); i++ {
 			if ob.bids[i] == l {
+				// Swap the current limit with the last one and reduce the slice by one
 				ob.bids[i] = ob.bids[len(ob.bids)-1]
 				ob.bids = ob.bids[:len(ob.bids)-1]
 			}
 		}
 	} else {
-		delete(ob.AskLimits, l.Price)
+		// If the limit is on the ask side
+		delete(ob.AskLimits, l.Price) // Remove the limit from AskLimits map using its price as the key
+
+		// Find and remove the limit from the asks slice
 		for i := 0; i < len(ob.asks); i++ {
 			if ob.asks[i] == l {
+				// Swap the current limit with the last one and reduce the slice by one
 				ob.asks[i] = ob.asks[len(ob.asks)-1]
 				ob.asks = ob.asks[:len(ob.asks)-1]
 			}
@@ -267,6 +279,7 @@ func (ob *OrderBook) clearLimit(bid bool, l *Limit) {
 func (ob *OrderBook) BidTotalVolume() float64 {
 	totalVolume := 0.0
 
+	// Calculate the total volume by iterating through bid limits
 	for i := 0; i < len(ob.bids); i++ {
 		totalVolume += ob.bids[i].TotalVolume
 	}
@@ -277,6 +290,7 @@ func (ob *OrderBook) BidTotalVolume() float64 {
 func (ob *OrderBook) AskTotalVolume() float64 {
 	totalVolume := 0.0
 
+	// Calculate the total volume by iterating through ask limits
 	for i := 0; i < len(ob.asks); i++ {
 		totalVolume += ob.asks[i].TotalVolume
 	}
