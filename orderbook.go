@@ -90,11 +90,6 @@ func (l *Limit) DeleteOrder(o *Order) {
 	sort.Sort(l.Orders)
 }
 
-func (ob *Order) CancelOrder(o *Order) {
-	limit := o.Limit
-	limit.DeleteOrder(o)
-}
-
 func (l *Limit) Fill(o *Order) []Match {
 	var (
 		matches        []Match  // Store the matches resulting from filling the order
@@ -274,6 +269,11 @@ func (ob *OrderBook) clearLimit(bid bool, l *Limit) {
 			}
 		}
 	}
+}
+
+func (ob *OrderBook) CancelOrder(o *Order) {
+	limit := o.Limit
+	limit.DeleteOrder(o)
 }
 
 func (ob *OrderBook) BidTotalVolume() float64 {
